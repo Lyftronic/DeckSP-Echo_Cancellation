@@ -76,6 +76,42 @@ class Plugin:
     vdc_handler: VdcDbHandler
     eel_parser: EELParser
 
+    async def toggle_echo_cancel(self, enable: bool):
+        config_dir = os.path.expanduser("~/.config/pipewire/pipewire.conf.d")
+        os.makedirs(config_dir, exist_ok=True)
+        config_file = os.path.join(config_dir, "99-input-denoising.conf")
+
+        if enable:
+            config_content = '''context.modules = [
+{   name = libpipewire-module-echo-cancel
+    args = {
+        source.props = {
+            node.name = "capture.echo_cancel"
+            node.description = "Echo-Cancelled Mic"
+        }
+        sink.props = {
+            node.name = "playback.echo_cancel"
+            node.description = "Echo-Cancelled Speakers"
+        }
+    }
+}
+]'''
+            with open(config_file, "w") as f:
+                f.write(config_content)
+            log.info("Echo Cancellation configuration created.")
+        else:
+            if os.path.exists(config_file):
+                os.remove(config_file)
+            log.info("Echo Cancellation configuration removed.")
+
+        try:
+            await restart_wireplumber()
+        except Exception as e:
+            log.error(f"Failed to restart wireplumber for Echo Cancellation: {e}")
+            
+        return True
+
+
     async def _main(self):
         log.info('Starting plugin backend...')
         self._remove_legacy_settings()
